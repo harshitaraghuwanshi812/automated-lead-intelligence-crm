@@ -1,0 +1,115 @@
+name: CI — Test & Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─────────────────────────────────────────────────────────
+  # Backend — Python Tests
+  # ─────────────────────────────────────────────────────────
+  backend-tests:
+    name: Backend Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run test suite
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          JWT_SECRET_KEY: ci-test-secret-key-32chars-minimum
+          GEMINI_API_KEY: ""
+          DATABASE_URL: ""
+        run: python -u run_tests.py
+
+      - name: Verify FastAPI app imports cleanly
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          JWT_SECRET_KEY: ci-test-secret-key-32chars-minimum
+        run: python -c "from app.main import app; print('FastAPI app OK — routes:', len(app.routes))"
+
+  # ─────────────────────────────────────────────────────────
+  # Frontend — Build
+  # ─────────────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend Build (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: ["20", "22"]
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Verify dist output
+        run: |
+          ls -lh dist/
+          test -f dist/index.html
+          test -d dist/assets
+          echo "Build output verified ✓"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-node${{ matrix.node-version }}
+          path: frontend/dist/
+          retention-days: 7
+
+  # ─────────────────────────────────────────────────────────
+  # Security — Dependency Audit
+  # ─────────────────────────────────────────────────────────
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python safety check
+        working-directory: backend
+        run: |
+          pip install safety
+          safety check -r requirements.txt --ignore 70612 || true
+
+      - name: Node.js audit
+        working-directory: frontend
+        run: |
+          npm install
+          npm audit --audit-level=critical || true

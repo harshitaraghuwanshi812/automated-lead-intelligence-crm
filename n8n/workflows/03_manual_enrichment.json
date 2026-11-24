@@ -1,0 +1,89 @@
+{
+  "name": "03_Manual_Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "manual-enrichment",
+        "responseMode": "lastNode"
+      },
+      "id": "node-enrich-trigger",
+      "name": "Enrich Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.body.confirm_credits }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-verify-credit-confirmation",
+      "name": "Verify Credit Confirmation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/enrichment/enrich",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "node-call-enrichment-api",
+      "name": "Call Provider Enrichment API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 240]
+    },
+    {
+      "parameters": {
+        "errorMessage": "Enrichment rejected: Credit usage confirmation is mandatory."
+      },
+      "id": "node-reject-unconfirmed",
+      "name": "Reject Unconfirmed Request",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [680, 380]
+    }
+  ],
+  "connections": {
+    "Enrich Trigger Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Credit Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Credit Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Call Provider Enrichment API",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject Unconfirmed Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

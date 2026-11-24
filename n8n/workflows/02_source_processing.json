@@ -1,0 +1,66 @@
+{
+  "name": "02_Source_Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "source-processing",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      },
+      "id": "node-webhook-source",
+      "name": "Source Ingest Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalization and filter check for fresher/0-1y/0-2y/internships\nconst item = $json.body || $json;\nconst title = (item.title || '').toLowerCase();\nconst desc = (item.description || '').toLowerCase();\n\nlet exp = 'fresher';\nif (title.includes('0-1') || desc.includes('0-1')) exp = '0-1_year';\nelse if (title.includes('0-2') || desc.includes('0-2')) exp = '0-2_years';\nelse if (title.includes('intern') || desc.includes('intern')) exp = 'internship';\n\nreturn {\n  ...item,\n  experience_level: exp,\n  normalized_at: new Date().toISOString()\n};"
+      },
+      "id": "node-normalize-fields",
+      "name": "Normalize & Classify Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/discovery/ingest",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "node-submit-fastapi",
+      "name": "Submit to FastAPI Deduplication",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [660, 300]
+    }
+  ],
+  "connections": {
+    "Source Ingest Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize & Classify Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize & Classify Lead": {
+      "main": [
+        [
+          {
+            "node": "Submit to FastAPI Deduplication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

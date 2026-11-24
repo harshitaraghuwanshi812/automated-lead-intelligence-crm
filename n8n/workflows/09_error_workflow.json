@@ -1,0 +1,61 @@
+{
+  "name": "09_Error_Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "node-error-trigger",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Map failure according to PRD Section 11 table\nconst err = $json.execution.error;\nconst message = err.message || 'Unknown automation failure';\n\nlet category = 'network';\nif (message.includes('429') || message.includes('rate limit')) category = 'rate_limit';\nelse if (message.includes('schema') || message.includes('validation')) category = 'validation';\nelse if (message.includes('credential') || message.includes('auth')) category = 'credential';\nelse if (message.includes('credit')) category = 'credit_exhaustion';\nelse if (message.includes('AI') || message.includes('Gemini')) category = 'ai_output';\n\nreturn {\n  workflow_name: $json.workflow.name,\n  failed_step: $json.execution.lastNodeExecuted || 'unknown_step',\n  failure_category: category,\n  error_message: message,\n  correlation_id: 'err_' + Date.now()\n};"
+      },
+      "id": "node-categorize-error",
+      "name": "Categorize Failure & Calculate Backoff",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/health/ping",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "node-log-error-center",
+      "name": "Log to Error Center & Alert Admin",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Categorize Failure & Calculate Backoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Categorize Failure & Calculate Backoff": {
+      "main": [
+        [
+          {
+            "node": "Log to Error Center & Alert Admin",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

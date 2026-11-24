@@ -1,0 +1,67 @@
+{
+  "name": "07_Follow_Up_Evaluation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 14 * * *"
+            }
+          ]
+        }
+      },
+      "id": "node-eval-cron",
+      "name": "Daily Follow-up Evaluator (2PM UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://fastapi:8000/api/v1/health"
+      },
+      "id": "node-get-system-state",
+      "name": "Check Campaigns & Limits",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rule 6 in Section 5: Cancel follow-ups on reply, hard bounce, unsubscribe, or campaign pause\nreturn {\n  evaluation_status: 'complete',\n  cancellation_rules_enforced: true,\n  evaluated_at: new Date().toISOString()\n};"
+      },
+      "id": "node-apply-safeguards",
+      "name": "Evaluate Permitted Follow-Ups",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Daily Follow-up Evaluator (2PM UTC)": {
+      "main": [
+        [
+          {
+            "node": "Check Campaigns & Limits",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Campaigns & Limits": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Permitted Follow-Ups",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

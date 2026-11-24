@@ -1,0 +1,53 @@
+{
+  "name": "08_Provider_Callback_Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "provider-callback",
+        "responseMode": "lastNode"
+      },
+      "id": "node-cb-webhook",
+      "name": "Provider Callback Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/webhooks/provider",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Provider-Signature",
+              "value": "={{ $headers['x-provider-signature'] || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "node-forward-fastapi",
+      "name": "Verify HMAC & Enforce Idempotency",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    }
+  ],
+  "connections": {
+    "Provider Callback Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify HMAC & Enforce Idempotency",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

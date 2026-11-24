@@ -1,0 +1,66 @@
+{
+  "name": "06_Campaign_Dispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "campaign-dispatch",
+        "responseMode": "lastNode"
+      },
+      "id": "node-dispatch-webhook",
+      "name": "Dispatch Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://fastapi:8000/api/v1/campaigns/drafts/{{ $json.body.campaign_draft_id }}/dispatch",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "node-execute-dispatch",
+      "name": "Execute 7 Pre-Send Checks & Send",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/health/ping"
+      },
+      "id": "node-update-metrics",
+      "name": "Update Dispatch Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [720, 300]
+    }
+  ],
+  "connections": {
+    "Dispatch Trigger Webhook": {
+      "main": [
+        [
+          {
+            "node": "Execute 7 Pre-Send Checks & Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute 7 Pre-Send Checks & Send": {
+      "main": [
+        [
+          {
+            "node": "Update Dispatch Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

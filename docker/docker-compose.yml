@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # Caddy Reverse Proxy (Automatic TLS, HTTPS, Routing)
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: lead_crm_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - lead_crm_net
+    depends_on:
+      - fastapi
+      - n8n
+
+  # FastAPI Backend (Core API, Direct SQL, Scoring, Approvals, Safeguards)
+  fastapi:
+    build:
+      context: ../backend
+      dockerfile: ../docker/Dockerfile.backend
+    container_name: lead_crm_backend
+    restart: unless-stopped
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL_NAME=${GEMINI_MODEL_NAME:-gemini-1.5-flash}
+      - CONTACTOUT_API_KEY=${CONTACTOUT_API_KEY}
+      - SNOVIO_API_USER_ID=${SNOVIO_API_USER_ID}
+      - SNOVIO_API_SECRET=${SNOVIO_API_SECRET}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-mock}
+      - EMAIL_API_KEY=${EMAIL_API_KEY}
+      - WEBHOOK_HMAC_SECRET=${WEBHOOK_HMAC_SECRET}
+      - N8N_BASE_URL=http://n8n:5678
+      - N8N_API_KEY=${N8N_API_KEY}
+      - DAILY_SEND_LIMIT=${DAILY_SEND_LIMIT:-50}
+      - MONTHLY_SEND_LIMIT=${MONTHLY_SEND_LIMIT:-1000}
+    volumes:
+      - ../backend:/app
+    networks:
+      - lead_crm_net
+    expose:
+      - "8000"
+
+  # n8n Community Edition (Workflow Orchestration, Schedulers, Webhooks)
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: lead_crm_n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${DOMAIN:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${DOMAIN:-localhost}/n8n/
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-super-secret-n8n-encryption-key-for-credentials}
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - lead_crm_net
+    expose:
+      - "5678"
+
+  # Playwright Worker (Approved Source Discovery Crawler)
+  playwright_worker:
+    build:
+      context: ../worker
+      dockerfile: ../docker/Dockerfile.worker
+    container_name: lead_crm_playwright_worker
+    restart: unless-stopped
+    environment:
+      - BACKEND_API_URL=http://fastapi:8000/api/v1
+      - PLAYWRIGHT_CONCURRENCY_LIMIT=${PLAYWRIGHT_CONCURRENCY_LIMIT:-2}
+      - SCRAPER_HEADLESS=true
+    networks:
+      - lead_crm_net
+    depends_on:
+      - fastapi
+
+volumes:
+  caddy_data:
+  caddy_config:
+  n8n_data:
+
+networks:
+  lead_crm_net:
+    driver: bridge

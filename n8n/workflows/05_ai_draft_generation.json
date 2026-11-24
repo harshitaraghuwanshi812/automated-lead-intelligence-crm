@@ -1,0 +1,65 @@
+{
+  "name": "05_AI_Draft_Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-draft-generation",
+        "responseMode": "lastNode"
+      },
+      "id": "node-ai-trigger",
+      "name": "AI Draft Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/campaigns/drafts/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "node-call-gemini",
+      "name": "Generate Draft via Gemini Flash",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify structured output compliance: must have subject, body, claims, warnings\nconst draft = $json;\nif (!draft.subject_line || !draft.email_body) {\n  throw new Error('AI output failed schema validation: missing subject or body.');\n}\nreturn { ...draft, status: 'awaiting_human_approval' };"
+      },
+      "id": "node-verify-output",
+      "name": "Verify Structured Schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "AI Draft Trigger Webhook": {
+      "main": [
+        [
+          {
+            "node": "Generate Draft via Gemini Flash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Draft via Gemini Flash": {
+      "main": [
+        [
+          {
+            "node": "Verify Structured Schema",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

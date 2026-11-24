@@ -1,0 +1,41 @@
+# Caddyfile for Oracle Always Free VM Reverse Proxy with Cloudflare DNS / HTTPS
+{$DOMAIN:api.leadintel.local} {
+    # TLS managed automatically or via Cloudflare Origin Certificate
+    # tls internal # Use internal self-signed for local testing or Cloudflare cert
+
+    # FastAPI backend API
+    handle /api/* {
+        reverse_proxy fastapi:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    handle /docs* {
+        reverse_proxy fastapi:8000
+    }
+
+    handle /openapi.json {
+        reverse_proxy fastapi:8000
+    }
+
+    # n8n Orchestrator Webhooks & UI
+    handle_path /n8n/* {
+        reverse_proxy n8n:5678 {
+            header_up Host {host}
+            header_up X-Real-IP {remote}
+            header_up X-Forwarded-For {remote}
+            header_up X-Forwarded-Proto {scheme}
+            # WebSocket support for n8n execution stream
+            header_up Upgrade {>Upgrade}
+            header_up Connection {>Connection}
+        }
+    }
+
+    # Health check endpoint for external pingers
+    handle /health {
+        respond "OK" 200
+    }
+}

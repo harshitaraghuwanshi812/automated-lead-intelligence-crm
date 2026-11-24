@@ -1,0 +1,66 @@
+{
+  "name": "04_Email_Verification",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "email-verification",
+        "responseMode": "lastNode"
+      },
+      "id": "node-verify-webhook",
+      "name": "Verification Trigger Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://fastapi:8000/api/v1/verification/verify",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}"
+      },
+      "id": "node-execute-verification",
+      "name": "Call Email Verification Engine",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://fastapi:8000/api/v1/scoring/evaluate/{{ $json.body.opportunity_id || '00000000-0000-0000-0000-000000000000' }}"
+      },
+      "id": "node-recalculate-score",
+      "name": "Recalculate 100-pt Confidence Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "Verification Trigger Webhook": {
+      "main": [
+        [
+          {
+            "node": "Call Email Verification Engine",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Email Verification Engine": {
+      "main": [
+        [
+          {
+            "node": "Recalculate 100-pt Confidence Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

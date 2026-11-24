@@ -1,0 +1,13 @@
+FROM mcr.microsoft.com/playwright/python:v1.45.0-jammy
+
+WORKDIR /worker
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install Playwright browser dependencies (Chromium only to preserve VM memory)
+RUN playwright install chromium --with-deps
+
+COPY . .
+
+CMD ["python", "scraper.py"]
